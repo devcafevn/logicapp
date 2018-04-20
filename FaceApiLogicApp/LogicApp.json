@@ -1,0 +1,404 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "metadata": {
+        "description": "Name of the Logic App."
+      }
+    },
+    "logicAppLocation": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "allowedValues": [
+        "[resourceGroup().location]",
+        "eastasia",
+        "southeastasia",
+        "centralus",
+        "eastus",
+        "eastus2",
+        "westus",
+        "northcentralus",
+        "southcentralus",
+        "northeurope",
+        "westeurope",
+        "japanwest",
+        "japaneast",
+        "brazilsouth",
+        "australiaeast",
+        "australiasoutheast",
+        "southindia",
+        "centralindia",
+        "westindia",
+        "canadacentral",
+        "canadaeast",
+        "uksouth",
+        "ukwest",
+        "westcentralus",
+        "westus2"
+      ],
+      "metadata": {
+        "description": "Location of the Logic App."
+      }
+    },
+    "oneDriveConnectionName": {
+      "type": "string",
+      "defaultValue": "onedrive"
+    },
+    "oneDriveConnectionDisplayName": {
+      "type": "string",
+      "defaultValue": "hanh.nguyenduc@outlook.com"
+    },
+    "blobConnectionName": {
+      "type": "string",
+      "defaultValue": "azureblob"
+    },
+    "blobConnectionDisplayName": {
+      "type": "string",
+      "defaultValue": "blobConnection"
+    },
+    "blobAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the storage account the connector should use."
+      },
+      "defaultValue": "azglobalbootcamp2018"
+    },
+    "blobAccessKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Specify a valid primary/secondary storage account access key."
+      }
+    },
+    "faceApiConnectionName": {
+      "type": "string",
+      "defaultValue": "faceapi"
+    },
+    "faceApiConnectionDisplayName": {
+      "type": "string",
+      "defaultValue": "faceApiConnection"
+    },
+    "faceApiKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "API Key"
+      }
+    },
+    "faceApiSiteUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Root site url (Example: https://westus.api.cognitive.microsoft.com ).If not specified site url will be defaulted to 'https://westus.api.cognitive.microsoft.com'."
+      },
+      "defaultValue": "https://southeastasia.api.cognitive.microsoft.com/face/v1.0"
+    },
+    "sqlConnectionName": {
+      "type": "string",
+      "defaultValue": "FaceDbConnection"
+    },
+    "sqlConnectionDisplayName": {
+      "type": "string",
+      "defaultValue": "FaceDbConnection"
+    },
+    "sqlServer": {
+      "type": "string",
+      "metadata": {
+        "description": "SQL server name"
+      },
+      "defaultValue": "face-sql.database.windows.net"
+    },
+    "sqlDatabase": {
+      "type": "string",
+      "metadata": {
+        "description": "SQL database name"
+      },
+      "defaultValue": "FaceDb"
+    },
+    "sqlUser": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Username credential"
+      }
+    },
+    "sqlPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Password credential"
+      }
+    },
+    "dashboardApiUrl": {
+      "type": "string"
+    },
+    "blobContainer": {
+      "type": "string"
+    },
+    "blobUrl": {
+      "type": "string"
+    },
+    "oneDriveFolder": {
+      "type": "string"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "name": "[parameters('logicAppName')]",
+      "type": "Microsoft.Logic/workflows",
+      "location": "[parameters('logicAppLocation')]",
+      "tags": {
+        "displayName": "Face Recognition App"
+      },
+      "apiVersion": "2016-06-01",
+      "properties": {
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "actions": {
+            "Create_blob": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['azureblob']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "body": "@triggerBody()",
+                "path": "/datasets/default/files",
+                "queries": {
+                  "folderPath": "[concat('/',parameters('blobContainer'))]",
+                  "name": "@base64ToString(triggerOutputs()['headers']['x-ms-file-name-encoded'])",
+                  "queryParametersSingleEncoded": true
+                }
+              },
+              "runAfter": {},
+              "runtimeConfiguration": {
+                "contentTransfer": {
+                  "transferMode": "Chunked"
+                }
+              }
+            },
+            "Detect_faces": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['faceapi']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "body": {
+                  "url": "[concat(parameters['blobUrl'],@{body('Create_blob')?['Path']})]"
+                },
+                "path": "/face/v1.0/detect",
+                "queries": {
+                  "returnFaceId": "true",
+                  "returnFaceAttributes": "age,gender,headPose,smile,facialHair,glasses",
+                  "returnFaceLandmarks": "true"
+                }
+              },
+              "runAfter": {
+                "Create_blob": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "For_each": {
+              "type": "Foreach",
+              "foreach": "@body('Detect_faces')",
+              "actions": {
+                "Insert_row": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['sql']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "body": {
+                      "FaceId": "@items('For_each')?['faceId']",
+                      "FileUrl": "[concat(parameters['blobUrl'],@{body('Create_blob')?['Path']})]",
+                      "Age": "@items('For_each')?['faceAttributes']['age']",
+                      "Gender": "@items('For_each')?['faceAttributes']['gender']",
+                      "Glassess": "@items('For_each')?['faceAttributes']['glasses']",
+                      "Smile": "@items('For_each')?['faceAttributes']['smile']",
+                      "Moustache": "@items('For_each')?['faceAttributes']['facialHair']['moustache']",
+                      "Beard": "@items('For_each')?['faceAttributes']['facialHair']['beard']",
+                      "Sideburns": "@items('For_each')?['faceAttributes']['facialHair']['sideburns']",
+                      "Pitch": "@items('For_each')?['faceAttributes']['headPose']['pitch']",
+                      "Yaw": "@items('For_each')?['faceAttributes']['headPose']['yaw']",
+                      "Roll": "@items('For_each')?['faceAttributes']['headPose']['roll']",
+                      "FaceRectangleHeight": "@items('For_each')?['faceRectangle']['height']",
+                      "FaceRectangleLeft": "@items('For_each')?['faceRectangle']['left']",
+                      "FaceRectangleTop": "@items('For_each')?['faceRectangle']['top']",
+                      "FaceRectangleWidth": "@items('For_each')?['faceRectangle']['width']"
+                    },
+                    "path": "/datasets/default/tables/@{encodeURIComponent(encodeURIComponent('[dbo].[Faces]'))}/items"
+                  },
+                  "runAfter": {}
+                },
+                "HTTP": {
+                  "type": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "[parameters('dashboardApiUrl')]",
+                    "headers": {
+                      "content-type": "application/json"
+                    },
+                    "body": {
+                      "Age": "@{items('For_each')?['faceAttributes']['age']}",
+                      "FaceId": "@{items('For_each')?['faceAttributes']['faceId']}",
+                      "Gender": "@{items('For_each')?['faceAttributes']['gender']}",
+                      "Moustache": "@{items('For_each')?['faceAttributes']['moustache']}",
+                      "Smile": "@{items('For_each')?['faceAttributes']['smile']}"
+                    }
+                  },
+                  "runAfter": {
+                    "Insert_row": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runAfter": {
+                "Detect_faces": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            }
+          },
+          "triggers": {
+            "When_a_file_is_created": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['onedrive']['connectionId']"
+                  }
+                },
+                "method": "get",
+                "path": "/datasets/default/triggers/onnewfile",
+                "queries": {
+                  "folderId": "534EADA22B329288!413",
+                  "inferContentType": true
+                }
+              },
+              "recurrence": {
+                "frequency": "Second",
+                "interval": 30
+              },
+              "metadata": {
+                "534EADA22B329288!413": "[parameters('oneDriveFolder')]"
+              }
+            }
+          },
+          "contentVersion": "1.0.0.0",
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "onedrive": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'onedrive')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('oneDriveConnectionName'))]",
+                "connectionName": "[parameters('oneDriveConnectionName')]"
+              },
+              "azureblob": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'azureblob')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('blobConnectionName'))]",
+                "connectionName": "[parameters('blobConnectionName')]"
+              },
+              "faceapi": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'faceapi')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('faceApiConnectionName'))]",
+                "connectionName": "[parameters('faceApiConnectionName')]"
+              },
+              "sql": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'sql')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('sqlConnectionName'))]",
+                "connectionName": "[parameters('sqlConnectionName')]"
+              }
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/connections', parameters('oneDriveConnectionName'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('blobConnectionName'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('faceApiConnectionName'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('sqlConnectionName'))]"
+      ]
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('oneDriveConnectionName')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'onedrive')]"
+        },
+        "displayName": "[parameters('oneDriveConnectionDisplayName')]"
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('blobConnectionName')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'azureblob')]"
+        },
+        "displayName": "[parameters('blobConnectionDisplayName')]",
+        "parameterValues": {
+          "accountName": "[parameters('blobAccountName')]",
+          "accessKey": "[parameters('blobAccessKey')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('faceApiConnectionName')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'faceapi')]"
+        },
+        "displayName": "[parameters('faceApiConnectionDisplayName')]",
+        "parameterValues": {
+          "apiKey": "[parameters('faceApiKey')]",
+          "siteUrl": "[parameters('faceApiSiteUrl')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('sqlConnectionName')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'sql')]"
+        },
+        "displayName": "[parameters('sqlConnectionDisplayName')]",
+        "parameterValues": {
+          "server": "[parameters('sqlServer')]",
+          "database": "[parameters('sqlDatabase')]",
+          "username": "[parameters('sqlUser')]",
+          "password": "[parameters('sqlPassword')]"
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "value": "<put your logic app name>"
+    },
+    "oneDriveConnectionName": {
+      "value": "<put your onedrive connection name>"
+    },
+    "oneDriveConnectionDisplayName": {
+      "value": "<put your onedrive connection display name>"
+    },
+    "blobConnectionName": {
+      "value": "<put your blob connection name>"
+    },
+    "blobConnectionDisplayName": {
+      "value": "<put your blob connection display name>"
+    },
+    "blobAccountName": {
+      "value": "<Name of the storage account the connector should use>"
+    },
+    "blobAccessKey": {
+      "value": "<Specify a valid primary/secondary storage account access key.>"
+    },
+    "faceApiConnectionName": {
+      "value": "<Name of Face API connection>."
+    },
+    "faceApiConnectionDisplayName": {
+      "value": "<Display name of Face API connection>."
+    },
+    "faceApiKey": {
+      "value": "<API Key>."
+    },
+    "faceApiSiteUrl": {
+      "value": "<ApiUrl>."
+    },
+    "sqlConnectionName": {
+      "value": "<Name of SQL Connection>."
+    },
+    "sqlConnectionDisplayName": {
+      "value": "<Display name of SQL Connection>."
+    },
+    "sqlServer": {
+      "value": "<SQL server name>."
+    },
+    "sqlDatabase": {
+      "value": "<SQL Database name>."
+    },
+    "sqlUser": {
+      "value": "<SQL user credential>"
+    },
+    "sqlPassword": {
+      "value": "<SQL password credential>"
+    },
+    "dashboardApiUrl": {
+      "value": "<Uri of dashboard API>"
+    },
+    "blobContainer": {
+      "value": "<name of container>"
+    },
+    "blobUrl": {
+      "value": "<name of container>"
+    },
+    "oneDriveFolder": {
+      "value": "<OneDrive Folder>"
+    }
+  }
+}
